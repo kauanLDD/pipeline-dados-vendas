@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Dados temporários (opcional - descomentar se quiser ignorar dados grandes)
+# data/bronze/*.csv
+# data/silver/*.csv
+# data/gold/*.csv
+
+# Base de dados SQLite
+*.db
+
+# Imagens geradas
+*.png
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+
