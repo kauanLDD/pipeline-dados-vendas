@@ -334,24 +334,28 @@ dag = DAG(
 task_bronze = PythonOperator(
     task_id='extract_bronze',
     python_callable=extract_bronze,
+    do_xcom_push=False,
     dag=dag
 )
 
 task_silver = PythonOperator(
     task_id='transform_silver',
     python_callable=transform_silver,
+    do_xcom_push=False,
     dag=dag
 )
 
 task_gold = PythonOperator(
     task_id='aggregate_gold',
     python_callable=aggregate_gold,
+    do_xcom_push=False,
     dag=dag
 )
 
 task_load = PythonOperator(
     task_id='load_database',
     python_callable=load_database,
+    do_xcom_push=False,
     dag=dag
 )
 
