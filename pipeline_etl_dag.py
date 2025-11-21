@@ -39,16 +39,13 @@ def extract_bronze(**context):
     try:
         criar_estrutura_diretorios()
         
-        arquivo_origem = os.path.join(PROJECT_ROOT, 'data.csv')
+        url_github = "https://raw.githubusercontent.com/kauanLDD/pipeline-dados-vendas/main/data.csv"
         
-        if not os.path.exists(arquivo_origem):
-            raise FileNotFoundError(f"Arquivo de dados nao encontrado: {arquivo_origem}")
-        
-        print(f"Carregando dados de: {arquivo_origem}")
-        df = pd.read_csv(arquivo_origem, sep=',', encoding='ISO-8859-1', low_memory=False)
+        print(f"Baixando dados do GitHub: {url_github}")
+        df = pd.read_csv(url_github, sep=',', encoding='ISO-8859-1', low_memory=False)
         
         df['data_ingestao'] = datetime.now()
-        df['fonte_arquivo'] = 'data.csv'
+        df['fonte_arquivo'] = 'github/pipeline-dados-vendas/data.csv'
         
         print(f"Dados carregados: {df.shape[0]:,} linhas x {df.shape[1]} colunas")
         
@@ -328,7 +325,7 @@ dag = DAG(
     'pipeline_etl_completo',
     default_args=default_args,
     description='Pipeline ETL completo: Bronze -> Silver -> Gold -> Database',
-    schedule_interval='@daily',
+    schedule='@daily',
     catchup=False,
     tags=['pipeline', 'etl', 'medallion', 'vendas']
 )
