@@ -27,10 +27,7 @@ def criar_estrutura_diretorios():
         os.makedirs(diretorio, exist_ok=True)
         print(f"Diretorio criado/verificado: {diretorio}")
 
-try:
-    criar_estrutura_diretorios()
-except Exception as e:
-    print(f"Nao foi possivel criar diretorios na inicializacao: {e}")
+# estrutura de diretorios sera criada durante execucao das tasks
 
 # funcao bronze layer - extracao de dados brutos
 def extract_bronze(**context):
@@ -44,6 +41,9 @@ def extract_bronze(**context):
         print(f"Baixando dados do GitHub: {url_github}")
         df = pd.read_csv(url_github, sep=',', encoding='ISO-8859-1', low_memory=False)
         
+        if df.empty:
+            raise ValueError("DataFrame vazio apos carregamento")
+        
         df['data_ingestao'] = datetime.now()
         df['fonte_arquivo'] = 'github/pipeline-dados-vendas/data.csv'
         
@@ -51,6 +51,9 @@ def extract_bronze(**context):
         
         caminho_bronze = os.path.join(BASE_DATA_PATH, 'bronze', 'dados_brutos.csv')
         df.to_csv(caminho_bronze, index=False)
+        
+        if not os.path.exists(caminho_bronze):
+            raise FileNotFoundError(f"Arquivo nao foi criado: {caminho_bronze}")
         
         print(f"Dados salvos na camada Bronze: {caminho_bronze}")
         print(f"Total de registros: {len(df):,}")
@@ -67,10 +70,17 @@ def transform_silver(**context):
     
     try:
         caminho_bronze = os.path.join(BASE_DATA_PATH, 'bronze', 'dados_brutos.csv')
-        print(f"Carregando dados de: {caminho_bronze}")
         
+        if not os.path.exists(caminho_bronze):
+            raise FileNotFoundError(f"Arquivo bronze nao encontrado: {caminho_bronze}")
+        
+        print(f"Carregando dados de: {caminho_bronze}")
         df = pd.read_csv(caminho_bronze)
-        df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'], format='%m/%d/%Y %H:%M')
+        
+        if df.empty:
+            raise ValueError("DataFrame vazio apos carregamento do bronze")
+        
+        df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'], format='%m/%d/%Y %H:%M', errors='coerce')
         
         print(f"Registros antes da limpeza: {len(df):,}")
         
@@ -95,7 +105,11 @@ def transform_silver(**context):
         print(f"Registros apos transformacao: {len(df):,}")
         
         caminho_silver = os.path.join(BASE_DATA_PATH, 'silver', 'dados_limpos.csv')
+        os.makedirs(os.path.dirname(caminho_silver), exist_ok=True)
         df.to_csv(caminho_silver, index=False)
+        
+        if not os.path.exists(caminho_silver):
+            raise FileNotFoundError(f"Arquivo silver nao foi criado: {caminho_silver}")
         
         print(f"Dados salvos na camada Silver: {caminho_silver}")
         print(f"Total de registros: {len(df):,} linhas x {df.shape[1]} colunas")
@@ -112,10 +126,17 @@ def aggregate_gold(**context):
     
     try:
         caminho_silver = os.path.join(BASE_DATA_PATH, 'silver', 'dados_limpos.csv')
-        print(f"Carregando dados de: {caminho_silver}")
         
+        if not os.path.exists(caminho_silver):
+            raise FileNotFoundError(f"Arquivo silver nao encontrado: {caminho_silver}")
+        
+        print(f"Carregando dados de: {caminho_silver}")
         df = pd.read_csv(caminho_silver)
-        df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
+        
+        if df.empty:
+            raise ValueError("DataFrame vazio apos carregamento do silver")
+        
+        df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'], errors='coerce')
         df['data_compra'] = df['InvoiceDate'].dt.date
         
         print(f"Dados carregados: {len(df):,} registros")
@@ -327,7 +348,8 @@ dag = DAG(
     description='Pipeline ETL completo: Bronze -> Silver -> Gold -> Database',
     schedule='@daily',
     catchup=False,
-    tags=['pipeline', 'etl', 'medallion', 'vendas']
+    tags=['pipeline', 'etl', 'medallion', 'vendas'],
+    max_active_runs=1
 )
 
 # definindo tarefas
@@ -335,6 +357,7 @@ task_bronze = PythonOperator(
     task_id='extract_bronze',
     python_callable=extract_bronze,
     do_xcom_push=False,
+    pool='default_pool',
     dag=dag
 )
 
@@ -342,6 +365,7 @@ task_silver = PythonOperator(
     task_id='transform_silver',
     python_callable=transform_silver,
     do_xcom_push=False,
+    pool='default_pool',
     dag=dag
 )
 
@@ -349,6 +373,7 @@ task_gold = PythonOperator(
     task_id='aggregate_gold',
     python_callable=aggregate_gold,
     do_xcom_push=False,
+    pool='default_pool',
     dag=dag
 )
 
@@ -356,6 +381,7 @@ task_load = PythonOperator(
     task_id='load_database',
     python_callable=load_database,
     do_xcom_push=False,
+    pool='default_pool',
     dag=dag
 )
 
